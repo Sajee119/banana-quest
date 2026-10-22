@@ -11,6 +11,7 @@ const passport = require('./config/passport');
 const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
 const { notFound, errorHandler } = require('./middleware/error.middleware');
+const gameRoutes = require('./routes/game.routes');
 
 const app = express();
 
@@ -62,6 +63,9 @@ app.get('/', (req, res) => {
 });
 app.use('/auth', authRoutes);
 app.use('/api/users', userRoutes);
+
+// Game routes
+app.use('/api/game', gameRoutes);
 
 // Error handling
 app.use(notFound);
