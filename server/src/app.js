@@ -29,8 +29,14 @@ const authLimiter = rateLimit({
     max: 30,
     message: { success: false, message: 'Too many attempts, try again later' },
 });
-app.use('/auth', authLimiter);
+const gameLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: { success: false, message: 'Slow down! Too many game requests.' },
+});
 
+app.use('/auth', authLimiter);
+app.use('/api/game', gameLimiter);
 // Session
 app.use(
     session({
@@ -59,10 +65,20 @@ app.use(passport.session());
 
 // Routes
 app.get('/', (req, res) => {
-    res.json({ message: 'Social Auth API', docs: '/api' });
+    res.json({ message: 'Banana Game API',endpoints: { auth: '/auth', user: '/api/users', game: '/api/game' } });
 });
 app.use('/auth', authRoutes);
 app.use('/api/users', userRoutes);
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+    res.json({
+        success: true,
+        status: 'ok',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+    });
+});
 
 // Game routes
 app.use('/api/game', gameRoutes);

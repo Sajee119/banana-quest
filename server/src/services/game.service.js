@@ -3,12 +3,13 @@ const GameSession = require('../models/GameSession');
 const Score = require('../models/Score');
 const { fetchPuzzle } = require('./banana.service');
 
-const SESSION_TTL_MS = 2 * 60 * 1000; // 2 minutes to answer
-const BASE_POINTS = 100;
-const FAST_BONUS_MAX = 50;            // max speed bonus
-const FAST_THRESHOLD_MS = 10_000;     // under 10s → full bonus
-const STREAK_MULTIPLIER_STEP = 0.1;   // +10% per streak level
-const MAX_STREAK_MULTIPLIER = 2.0;
+const env = require('../config/env');
+const SESSION_TTL_MS = env.GAME_SESSION_TTL_MS;
+const BASE_POINTS = env.GAME_BASE_POINTS;
+const FAST_BONUS_MAX = env.GAME_FAST_BONUS_MAX;
+const FAST_THRESHOLD_MS = env.GAME_FAST_THRESHOLD_MS;
+const STREAK_MULTIPLIER_STEP = 0.1;
+const MAX_STREAK_MULTIPLIER = env.GAME_MAX_STREAK_MULTIPLIER;
 
 /**
  * Start a new game: fetch puzzle, hide solution, return only image.

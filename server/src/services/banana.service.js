@@ -1,8 +1,9 @@
 const logger = require('../utils/logger');
 
 const BANANA_BASE = 'http://marcconrad.com/uob/banana/api.php';
-const FETCH_TIMEOUT_MS = 8000;
-const MAX_RETRIES = 3;
+const env = require('../config/env');
+const FETCH_TIMEOUT_MS = env.BANANA_API_TIMEOUT_MS;
+const MAX_RETRIES = env.BANANA_API_MAX_RETRIES;
 
 class BananaApiError extends Error {
     constructor(message, status = 502) {
