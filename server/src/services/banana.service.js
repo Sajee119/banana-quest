@@ -42,15 +42,20 @@ async function fetchPuzzle({ base64 = false } = {}) {
             const res = await fetchWithTimeout(url);
             const data = await res.json();
 
-            // API returns { question: "<img src='...'>", solution: <number>, base64?: "..." }
-            const imageUrl = extractImageUrl(data.question);
+            // API returns an image URL or PNG base64 in `question`.
+            const imageBase64 = base64 && typeof data.question === 'string'
+                ? data.question
+                : data.base64 || null;
+            const imageUrl = base64 && imageBase64
+                ? `data:image/png;base64,${imageBase64}`
+                : extractImageUrl(data.question);
             const solution = Number(data.solution);
 
             if (!imageUrl || Number.isNaN(solution)) {
                 throw new BananaApiError('Malformed Banana API response');
             }
 
-            return { imageUrl, solution, imageBase64: data.base64 || null };
+            return { imageUrl, solution, imageBase64 };
         } catch (err) {
             lastErr = err;
             logger.warn(`Banana API attempt ${attempt} failed: ${err.message}`);
@@ -64,6 +69,7 @@ async function fetchPuzzle({ base64 = false } = {}) {
 
 function extractImageUrl(questionHtml) {
     if (typeof questionHtml !== 'string') return null;
+    if (/^https?:\/\//i.test(questionHtml)) return questionHtml;
     const match = questionHtml.match(/src=["']([^"']+)["']/i);
     return match ? match[1] : null;
 }
