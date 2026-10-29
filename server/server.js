@@ -4,11 +4,17 @@ const app = require('./src/app');
 const logger = require('./src/utils/logger');
 
 (async () => {
-    await connectWithRetry();
-
-    const server = app.listen(env.PORT, () => {
-        logger.info(`🚀 Server running on port ${env.PORT} (${env.NODE_ENV})`);
-    });
+    let server;
+    try {
+        await connectWithRetry();
+        server = app.listen(env.PORT, () => {
+            logger.info(`🚀 Server running on port ${env.PORT} (${env.NODE_ENV})`);
+        });
+    } catch (err) {
+        logger.error(`Server startup failed: ${err.message}`);
+        process.exitCode = 1;
+        return;
+    }
 
     // Graceful shutdown
     const shutdown = async (signal) => {

@@ -17,15 +17,22 @@ async function connectWithRetry(attempts = 1) {
         mongoose.connection.on('error', (err) => logger.error('MongoDB error:', err));
         mongoose.connection.on('disconnected', () => logger.warn('MongoDB disconnected'));
         mongoose.connection.on('reconnected', () => logger.info('MongoDB reconnected'));
+        return;
     } catch (err) {
-        logger.error(`MongoDB connection attempt ${attempts} failed: ${err.message}`);
-        if (attempts < MAX_RETRIES) {
-            logger.info(`Retrying in ${RETRY_DELAY_MS}ms...`);
-            setTimeout(() => connectWithRetry(attempts + 1), RETRY_DELAY_MS);
-        } else {
-            logger.error('Max retries reached. Exiting.');
-            process.exit(1);
+        const detail = err.message.includes('whitelist')
+            || err.message.includes('Could not connect to any servers')
+            ? ' Check that this machine IP is allowed in MongoDB Atlas Network Access.'
+            : '';
+        logger.error(`MongoDB connection attempt ${attempts} failed: ${err.message}.${detail}`);
+        if (attempts >= MAX_RETRIES) {
+            throw new Error(`MongoDB connection failed after ${MAX_RETRIES} attempts.${detail}`, {
+                cause: err,
+            });
         }
+
+        logger.info(`Retrying in ${RETRY_DELAY_MS}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+        return connectWithRetry(attempts + 1);
     }
 }
 
