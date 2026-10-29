@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import BananaLogo from '../components/BananaLogo.jsx';
 import Button from '../components/Button.jsx';
-import { useAuth } from '../context/AuthContext.jsx';
+import { useAuth } from '../context/auth-context.js';
 
 export default function LandingPage() {
     const { user } = useAuth();

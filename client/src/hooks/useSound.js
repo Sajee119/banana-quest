@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Howl } from 'howler';
 
 // Free CDN sounds — swap for your own assets in /public/sounds
@@ -10,26 +10,53 @@ const SOUNDS = {
     win: 'https://cdn.pixabay.com/download/audio/2022/03/15/audio_9423b8f5f9.mp3',
 };
 
+function readMutedPreference() {
+    try {
+        return localStorage.getItem('muted') === 'true';
+    } catch {
+        return false;
+    }
+}
+
 export function useSound() {
     const sounds = useRef({});
-    const muted = useRef(localStorage.getItem('muted') === 'true');
+    const [muted, setMuted] = useState(readMutedPreference);
+    const mutedRef = useRef(muted);
 
-    if (Object.keys(sounds.current).length === 0) {
+    useEffect(() => {
+        mutedRef.current = muted;
+    }, [muted]);
+
+    useEffect(() => {
+        const created = {};
         Object.entries(SOUNDS).forEach(([key, src]) => {
-            sounds.current[key] = new Howl({ src: [src], volume: 0.4, preload: true });
+            created[key] = new Howl({ src: [src], volume: 0.4, preload: true });
         });
-    }
+        sounds.current = created;
+
+        return () => {
+            Object.values(created).forEach((sound) => sound.unload());
+            sounds.current = {};
+        };
+    }, []);
 
     const play = useCallback((name) => {
-        if (muted.current) return;
+        if (mutedRef.current) return;
         sounds.current[name]?.play();
     }, []);
 
     const toggleMute = useCallback(() => {
-        muted.current = !muted.current;
-        localStorage.setItem('muted', String(muted.current));
-        return muted.current;
+        setMuted((prev) => {
+            const next = !prev;
+            mutedRef.current = next;
+            try {
+                localStorage.setItem('muted', String(next));
+            } catch {
+                // Storage can be unavailable (private mode); muting still works for this session.
+            }
+            return next;
+        });
     }, []);
 
-    return { play, toggleMute, isMuted: () => muted.current };
+    return { play, toggleMute, muted };
 }

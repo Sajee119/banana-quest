@@ -10,7 +10,7 @@ async function connectWithRetry(attempts = 1) {
         await mongoose.connect(env.MONGODB_URI, {
             serverSelectionTimeoutMS: 5000,
             maxPoolSize: 10,
-            autoIndex: env.NODE_ENV === 'production',
+            autoIndex: env.NODE_ENV !== 'production',
         });
         logger.info('MongoDB connection established successfully.');
 

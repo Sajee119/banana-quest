@@ -94,6 +94,7 @@ async function submitAnswer(userId, sessionId, answer) {
         pointsAwarded: points,
         answerMs,
         solution: session.solution, // reveal only AFTER answering
+        playerAnswer: session.playerAnswer,
         stats: {
         totalPoints: score.totalPoints,
         gamesPlayed: score.gamesPlayed,

@@ -17,6 +17,8 @@ api.interceptors.response.use(
 
 export const authApi = {
     status: () => api.get('/auth/status').then((r) => r.data),
+    login: (credentials) => api.post('/auth/login', credentials).then((r) => r.data),
+    register: (payload) => api.post('/auth/register', payload).then((r) => r.data),
     logout: () => api.post('/auth/logout').then((r) => r.data),
     googleLoginUrl: '/auth/google',
     facebookLoginUrl: '/auth/facebook',

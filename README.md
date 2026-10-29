@@ -25,9 +25,23 @@ The Vite development server will print the local URL in the terminal.
 ```bash
 cd server
 npm install
+npm run dev      # Start with nodemon
+# or
+npm start        # Start with Node
 ```
 
-The server dependencies are installed, but the backend entry point and start script are not configured yet.
+Create a `server/.env` file based on `server/.env.example` before starting the server.
+
+## Available Server Commands
+
+From `server/`:
+
+```bash
+npm run dev      # Start the development server with nodemon
+npm start        # Start the server
+npm run lint     # Run Oxlint
+npm test         # Run the test suite
+```
 
 ## Available Client Commands
 

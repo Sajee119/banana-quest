@@ -1,10 +1,60 @@
 @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@400;600;700;800&display=swap');
+@import 'tailwindcss';
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@theme {
+  --color-banana-50: #FFFCEB;
+  --color-banana-100: #FFF6C2;
+  --color-banana-200: #FFEC85;
+  --color-banana-300: #FFDD48;
+  --color-banana-400: #FFCB1F;
+  --color-banana-500: #F5A800;
+  --color-banana-600: #D98500;
+  --color-banana-700: #B56000;
+  --color-banana-800: #8F4500;
+  --color-banana-900: #6B3200;
+
+  --font-display: 'Baloo 2', cursive;
+  --font-body: 'Nunito', sans-serif;
+
+  --shadow-game: 0 10px 0 rgba(0, 0, 0, 0.2), 0 20px 40px rgba(0, 0, 0, 0.15);
+  --shadow-game-sm: 0 4px 0 rgba(0, 0, 0, 0.2);
+
+  --animate-wiggle: wiggle 1.5s ease-in-out infinite;
+  --animate-pop: pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --animate-shake: shake 0.4s ease-in-out;
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-shine: shine 2s linear infinite;
+
+  @keyframes wiggle {
+    0%, 100% { transform: rotate(-3deg); }
+    50% { transform: rotate(3deg); }
+  }
+
+  @keyframes pop {
+    0% { transform: scale(0.8); opacity: 0; }
+    60% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
+  }
+
+  @keyframes shine {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+}
 
 html, body, #root { height: 100%; }
+
 body {
   @apply font-body bg-gradient-to-br from-banana-100 via-banana-50 to-amber-100 text-banana-900;
   background-attachment: fixed;

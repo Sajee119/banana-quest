@@ -1,35 +1,33 @@
 const router = require('express').Router();
 const { ensureAuthenticated } = require('../middleware/auth.middleware');
 const gameService = require('../services/game.service');
+const asyncHandler = require('../utils/asyncHandler');
 
-router.get('/me', ensureAuthenticated, (req, res, next) => {
-    try {
-        res.json({
-            success: true,
-            user: {
-                id: req.user.id,
-                email: req.user.email,
-                displayName: req.user.displayName,
-                primaryProvider: req.user.primaryProvider,
-                providerNames: req.user.providerNames,
-                avatar: req.user.avatar,
-                createdAt: req.user.createdAt,
-                lastLoginAt: req.user.lastLoginAt,
-            },
-            stats: {
-                totalPoints: stats.totalPoints || 0,
-                gamesPlayed: stats.gamesPlayed || 0,
-                gamesWon: stats.gamesWon || 0,
-                currentStreak: stats.currentStreak || 0,
-                bestStreak: stats.bestStreak || 0,
-                fastestAnswerMs: stats.fastestAnswerMs || null,
-            },
-        });
-    } catch (err) {
-        next(err);
-    }
-    
-});
+router.get('/me', ensureAuthenticated, asyncHandler(async (req, res) => {
+    const stats = await gameService.getUserStats(req.user.id);
+
+    res.json({
+        success: true,
+        user: {
+            id: req.user.id,
+            email: req.user.email,
+            displayName: req.user.displayName,
+            primaryProvider: req.user.primaryProvider,
+            providerNames: req.user.providerNames,
+            avatar: req.user.avatar,
+            createdAt: req.user.createdAt,
+            lastLoginAt: req.user.lastLoginAt,
+        },
+        stats: {
+            totalPoints: stats.totalPoints || 0,
+            gamesPlayed: stats.gamesPlayed || 0,
+            gamesWon: stats.gamesWon || 0,
+            currentStreak: stats.currentStreak || 0,
+            bestStreak: stats.bestStreak || 0,
+            fastestAnswerMs: stats.fastestAnswerMs ?? null,
+        },
+    });
+}));
 
 router.get('/leaderboard', async (req, res, next) => {
     try {

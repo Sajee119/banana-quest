@@ -19,12 +19,12 @@ const scoreSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-// Add points & update streaks atomically
+// Add points & update streaks
 scoreSchema.statics.recordResult = async function (userId, { isCorrect, points, answerMs }) {
     const score = await this.findOneAndUpdate(
         { user: userId },
         { $setOnInsert: { user: userId } },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true }
     );
 
     score.gamesPlayed += 1;

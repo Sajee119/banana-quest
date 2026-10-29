@@ -1,7 +1,6 @@
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { authApi, userApi } from '../api/client';
-
-const AuthContext = createContext(null);
+import { AuthContext } from './auth-context';
 
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
@@ -10,13 +9,30 @@ export function AuthProvider({ children }) {
 
     const refresh = useCallback(async () => {
         try {
-            const status = await authApi.status();
-            if (status.authenticated) {
+            let status;
+            try {
+                status = await authApi.status();
+            } catch {
+                // One quick retry covers a cold/slow database connection
+                // instead of treating the player as logged out.
+                await new Promise((resolve) => setTimeout(resolve, 800));
+                status = await authApi.status();
+            }
+
+            if (!status.authenticated) {
+                setUser(null);
+                setStats(null);
+                return;
+            }
+
+            try {
                 const data = await userApi.me();
                 setUser(data.user);
                 setStats(data.stats);
-            } else {
-                setUser(null);
+            } catch {
+                // The session is valid even if the profile request fails.
+                // Keeping the user signed in avoids bouncing back to /login.
+                setUser(status.user || null);
                 setStats(null);
             }
         } catch {
@@ -27,7 +43,28 @@ export function AuthProvider({ children }) {
         }
     }, []);
 
-    useEffect(() => { refresh(); }, [refresh]);
+    useEffect(() => {
+        const loadSession = async () => { await refresh(); };
+        loadSession();
+    }, [refresh]);
+
+    const signIn = useCallback(async (request) => {
+        const data = await request();
+        setUser(data.user);
+        setStats(null);
+        setLoading(false);
+
+        // Fetch the player's stats in the background. A failure here must not
+        // undo a successful login.
+        userApi.me()
+            .then((me) => {
+                setUser(me.user);
+                setStats(me.stats);
+            })
+            .catch(() => {});
+
+        return data;
+    }, []);
 
     const logout = async () => {
         await authApi.logout();
@@ -36,10 +73,8 @@ export function AuthProvider({ children }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, stats, setStats, loading, refresh, logout }}>
+        <AuthContext.Provider value={{ user, stats, setStats, loading, refresh, signIn, logout }}>
             {children}
         </AuthContext.Provider>
     );
 }
-
-export const useAuth = () => useContext(AuthContext);

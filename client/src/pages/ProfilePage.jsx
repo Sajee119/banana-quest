@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, Trophy, Target, Flame, Zap, Crown, Gamepad2 } from 'lucide-react';
 import Card from '../components/Card.jsx';
 import Button from '../components/Button.jsx';
-import { useAuth } from '../context/AuthContext.jsx';
+import { useAuth } from '../context/auth-context.js';
 
 export default function ProfilePage() {
     const { user, stats } = useAuth();

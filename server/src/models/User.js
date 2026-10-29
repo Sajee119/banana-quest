@@ -1,4 +1,7 @@
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+
+const BCRYPT_ROUNDS = 12;
 
 const userSchema = new mongoose.Schema(
     {
@@ -23,7 +26,7 @@ const userSchema = new mongoose.Schema(
             type: String,
             default: null
         },
-        provider: [
+        providers: [
             {
                 name: {
                     type: String,
@@ -40,9 +43,14 @@ const userSchema = new mongoose.Schema(
                 }
             }
         ],
-        lastLogin: {
+        lastLoginAt: {
             type: Date,
             default: Date.now
+        },
+        passwordHash: {
+            type: String,
+            select: false,
+            default: null
         },
         isActive: {
             type: Boolean,
@@ -52,7 +60,11 @@ const userSchema = new mongoose.Schema(
     {
         timestamps: true,
         toJSON: {
-            virtuals: true
+            virtuals: true,
+            transform: (_doc, ret) => {
+                delete ret.passwordHash;
+                return ret;
+            }
         },
         toObject: {
             virtuals: true
@@ -61,7 +73,6 @@ const userSchema = new mongoose.Schema(
 );
 
 userSchema.index({ 'providers.providerId': 1, 'providers.name': 1 });
-userSchema.index({ email: 1 }, { unique: true });
 
 userSchema.virtual('displayName').get(function () {
     const full = `${this.firstName} ${this.lastName}`.trim();
@@ -75,6 +86,35 @@ userSchema.virtual('primaryProvider').get(function () {
 userSchema.virtual('providerNames').get(function () {
     return this.providers.map((p) => p.name);
 });
+
+userSchema.methods.setPassword = async function (password) {
+    this.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+};
+
+userSchema.methods.comparePassword = function (password) {
+    if (!this.passwordHash) return Promise.resolve(false);
+    return bcrypt.compare(password, this.passwordHash);
+};
+
+userSchema.statics.findByEmailWithPassword = function (email) {
+    return this.findOne({ email: String(email).trim().toLowerCase() }).select('+passwordHash');
+};
+
+userSchema.statics.registerLocal = async function ({ name, email, password }) {
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const [firstName, ...rest] = String(name).trim().split(/\s+/);
+
+    const user = new this({
+        email: normalizedEmail,
+        firstName,
+        lastName: rest.join(' '),
+        providers: [{ name: 'local', providerId: normalizedEmail }],
+    });
+
+    await user.setPassword(password);
+    await user.save();
+    return user;
+};
 
 userSchema.statics.findOrCreateByProvider = async function (providerName, providerId, profileData) {
     let user = await this.findOne({

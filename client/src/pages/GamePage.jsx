@@ -6,13 +6,13 @@ import BananaLogo from '../components/BananaLogo.jsx';
 import Button from '../components/Button.jsx';
 import Card from '../components/Card.jsx';
 import { gameApi } from '../api/client.js';
-import { useAuth } from '../context/AuthContext.jsx';
+import { useAuth } from '../context/auth-context.js';
 import { useSound } from '../hooks/useSound.js';
 import Confetti from '../components/Confetti.jsx';
 
 export default function GamePage() {
   const { stats, setStats, logout } = useAuth();
-  const { play, toggleMute, isMuted } = useSound();
+  const { play, toggleMute, muted } = useSound();
 
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -21,9 +21,9 @@ export default function GamePage() {
   const [phase, setPhase] = useState('idle'); // idle | playing | correct | wrong | expired
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
-  const [muted, setMuted] = useState(isMuted());
 
   const timerRef = useRef(null);
+  const deadlineRef = useRef(0);
   const inputRef = useRef(null);
 
   // ---- Start game ----
@@ -35,6 +35,7 @@ export default function GamePage() {
     try {
       const { data } = await gameApi.start();
       setSession(data);
+      deadlineRef.current = Date.now() + data.timeLimitMs;
       setTimeLeft(Math.ceil(data.timeLimitMs / 1000));
       setPhase('playing');
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -47,25 +48,24 @@ export default function GamePage() {
 
   // ---- Countdown ----
   useEffect(() => {
-    if (phase !== 'playing') return;
+    if (phase !== 'playing') return undefined;
+
     timerRef.current = setInterval(() => {
-      setTimeLeft((t) => {
-        const next = t - 1;
-        if (next <= 5 && next > 0) play('tick');
-        return next;
-      });
+      const next = Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000));
+      setTimeLeft(next);
+
+      if (next === 0) {
+        clearInterval(timerRef.current);
+        setPhase('expired');
+        setResult({ isCorrect: false, pointsAwarded: 0, message: 'Time up!' });
+        play('wrong');
+      } else if (next <= 5) {
+        play('tick');
+      }
     }, 1000);
+
     return () => clearInterval(timerRef.current);
   }, [phase, play]);
-
-  useEffect(() => {
-    if (phase === 'playing' && timeLeft <= 0) {
-      clearInterval(timerRef.current);
-      setPhase('expired');
-      setResult({ isCorrect: false, pointsAwarded: 0, message: 'Time up!' });
-      play('wrong');
-    }
-  }, [timeLeft, phase, play]);
 
   // ---- Submit ----
   const submitAnswer = async (e) => {
@@ -76,7 +76,6 @@ export default function GamePage() {
       setError('Enter a valid number');
       return;
     }
-    clearInterval(timerRef.current);
     setLoading(true);
     try {
       const { data } = await gameApi.answer(session.sessionId, num);
@@ -97,8 +96,6 @@ export default function GamePage() {
     }
   };
 
-  const handleMute = () => { const m = toggleMute(); setMuted(m); };
-
   const timerPct = session ? Math.max(0, (timeLeft / (session.timeLimitMs / 1000)) * 100) : 100;
 
   return (
@@ -113,7 +110,7 @@ export default function GamePage() {
         <div className="flex items-center gap-2 md:gap-3">
           <HUDStat icon={<Trophy size={16} />} label="Points" value={stats?.totalPoints ?? 0} accent />
           <HUDStat icon={<Flame size={16} />} label="Streak" value={stats?.currentStreak ?? 0} />
-          <Button variant="ghost" className="!p-2" onClick={handleMute} title="Toggle sound">
+          <Button variant="ghost" className="!p-2" onClick={toggleMute} title="Toggle sound">
             {muted ? <VolumeX size={20} /> : <Volume2 size={20} />}
           </Button>
           <Link to="/profile"><Button variant="ghost" className="!p-2" title="Profile"><User size={20} /></Button></Link>
