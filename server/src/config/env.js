@@ -11,6 +11,7 @@ const schema = Joi.object({
     FACEBOOK_APP_ID: Joi.string().required(),
     FACEBOOK_APP_SECRET: Joi.string().required(),
     CLIENT_URL: Joi.string().uri().default('http://localhost:5173'),
+    AUTH_CALLBACK_URL: Joi.string().uri().default('http://localhost:3000'),
     COOKIE_SECURE: Joi.boolean().default(false),
 
     GAME_SESSION_TTL_MS: Joi.number().default(120000),

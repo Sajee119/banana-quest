@@ -43,3 +43,15 @@ npm run preview  # Preview the production build
 ## Development
 
 Run the client and server in separate terminals. Keep secrets and local configuration in `.env` files; these files are excluded from Git.
+
+### OAuth provider setup
+
+For local development, configure the provider applications with these exact callback URLs:
+
+- Google: `http://localhost:3000/auth/google/callback`
+- Facebook: `http://localhost:3000/auth/facebook/callback`
+
+Set `CLIENT_URL` to the client URL (`http://localhost:5173`) and
+`AUTH_CALLBACK_URL` to the server URL (`http://localhost:3000`). Facebook login
+requests the `public_profile` permission; email is optional because some
+Facebook applications do not grant the email permission.

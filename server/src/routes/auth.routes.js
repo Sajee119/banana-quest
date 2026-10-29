@@ -25,7 +25,7 @@ router.get(
 router.get(
     '/facebook',
     ensureGuest,
-    passport.authenticate('facebook', { scope: ['email'] })
+    passport.authenticate('facebook', { scope: ['public_profile'] })
 );
 
 router.get(
