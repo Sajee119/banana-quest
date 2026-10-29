@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { ensureAuthenticated } = require('../middlewares/auth.middleware');
+const { ensureAuthenticated } = require('../middleware/auth.middleware');
 const gameService = require('../services/game.service');
 
 router.get('/me', ensureAuthenticated, (req, res, next) => {

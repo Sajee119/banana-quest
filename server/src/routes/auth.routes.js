@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const passport = require('passport');
 const env = require('../config/env');
-const { ensureGuest } = require('../middlewares/auth.middleware');
+const { ensureGuest } = require('../middleware/auth.middleware');
 
 const authOptions = {
     failureRedirect: `${env.CLIENT_URL}/login-failed`,
@@ -40,7 +40,7 @@ router.post('/logout', (req, res, next) => {
         if (err) return next(err);
         req.session.destroy((err2) => {
         if (err2) return next(err2);
-            res.clearCookie('connect.sid');
+            res.clearCookie('sid');
             res.json({ success: true, message: 'Logged out' });
         });
     });

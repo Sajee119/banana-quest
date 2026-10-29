@@ -32,40 +32,4 @@ router.get('/stats', asyncHandler(async (req, res) => {
     res.json({ success: true, data: stats });
 }));
 
-/**
- * POST /api/game/answer
- * Body: { sessionId, answer }
- */
-router.post('/answer', async (req, res, next) => {
-    try {
-        const { value, error } = answerSchema.validate(req.body);
-        if (error) {
-            return res.status(400).json({ success: false, message: error.message });
-        }
-
-        const result = await gameService.submitAnswer(req.user.id, value.sessionId, value.answer);
-
-        if (result.error) {
-            return res.status(result.status).json({ success: false, message: result.error });
-        }
-
-        res.json({ success: true, data: result });
-    } catch (err) {
-        next(err);
-    }
-});
-
-/**
- * GET /api/game/stats
- * Personal scoreboard.
- */
-router.get('/stats', async (req, res, next) => {
-    try {
-        const stats = await gameService.getUserStats(req.user.id);
-        res.json({ success: true, data: stats });
-    } catch (err) {
-        next(err);
-    }
-});
-
 module.exports = router;

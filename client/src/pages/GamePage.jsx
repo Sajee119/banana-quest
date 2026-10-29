@@ -11,7 +11,7 @@ import { useSound } from '../hooks/useSound.js';
 import Confetti from '../components/Confetti.jsx';
 
 export default function GamePage() {
-  const { user, stats, setStats, logout, refresh } = useAuth();
+  const { stats, setStats, logout } = useAuth();
   const { play, toggleMute, isMuted } = useSound();
 
   const [session, setSession] = useState(null);
@@ -25,7 +25,6 @@ export default function GamePage() {
 
   const timerRef = useRef(null);
   const inputRef = useRef(null);
-  const tickSecondRef = useRef(null);
 
   // ---- Start game ----
   const startGame = useCallback(async () => {

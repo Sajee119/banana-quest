@@ -1,6 +1,6 @@
 const express = require('express');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
+const { MongoStore } = require('connect-mongo');
 const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
