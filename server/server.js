@@ -1,5 +1,5 @@
 const env = require('./src/config/env');
-const { connectWithRetry, disconnect } = require('./src/config/db');
+const { connect: connectWithRetry, disconnect } = require('./src/config/db');
 const app = require('./src/app');
 const logger = require('./src/utils/logger');
 
