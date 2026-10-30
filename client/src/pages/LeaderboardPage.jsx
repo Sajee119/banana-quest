@@ -19,6 +19,7 @@ import Button from '../components/Button.jsx';
 import { userApi } from '../api/client.js';
 import { useAuth } from '../context/auth-context.js';
 import { initials } from '../lib/format.js';
+import { usePageTitle } from '../hooks/usePageTitle.js';
 
 const MEDALS = { 1: '🥇', 2: '🥈', 3: '🥉' };
 
@@ -47,6 +48,7 @@ const PODIUM_STYLES = {
 };
 
 export default function LeaderboardPage() {
+    usePageTitle('Leaderboard');
     const { user } = useAuth();
     const [entries, setEntries] = useState([]);
     const [me, setMe] = useState(null);

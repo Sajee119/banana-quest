@@ -30,6 +30,7 @@ import Button from '../components/Button.jsx';
 import { useAuth } from '../context/auth-context.js';
 import { userApi } from '../api/client.js';
 import { MODE_LIST } from '../lib/format.js';
+import { usePageTitle } from '../hooks/usePageTitle.js';
 
 const MODE_ICONS = { classic: Banana, blitz: Timer, zen: Leaf };
 
@@ -124,6 +125,7 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 const CURRENT_YEAR = new Date().getFullYear();
 
 export default function LandingPage() {
+    usePageTitle();
     const { user } = useAuth();
     const [topPlayers, setTopPlayers] = useState([]);
     const [loadingTop, setLoadingTop] = useState(true);
@@ -562,7 +564,7 @@ export default function LandingPage() {
                         <div className="mt-3 flex flex-wrap gap-3 text-xs font-bold text-banana-500">
                             <span className="flex items-center gap-1"><Volume2 size={14} /> Synthesised audio</span>
                             <span className="flex items-center gap-1"><Smartphone size={14} /> Mobile ready</span>
-                            <span className="flex items-center gap-1"><Clock size={14} /> 30 sec rounds</span>
+                            <span className="flex items-center gap-1"><Clock size={14} /> Timed rounds</span>
                         </div>
                     </div>
 

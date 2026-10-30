@@ -22,6 +22,10 @@ const answerSchema = Joi.object({
     answer: Joi.number().integer().min(0).max(1000).required(),
 });
 
+const expireSchema = Joi.object({
+    sessionId: Joi.string().hex().length(24).required(),
+});
+
 router.post('/start', asyncHandler(async (req, res) => {
     const { value, error } = startSchema.validate(req.body || {});
     if (error) return res.status(400).json({ success: false, message: error.message });
@@ -35,7 +39,33 @@ router.post('/answer', asyncHandler(async (req, res) => {
     if (error) return res.status(400).json({ success: false, message: error.message });
 
     const result = await gameService.submitAnswer(req.user.id, value.sessionId, value.answer);
-    if (result.error) return res.status(result.status).json({ success: false, message: result.error });
+    if (result.error) {
+        return res.status(result.status).json({
+            success: false,
+            message: result.error,
+            solution: result.solution ?? null,
+            stats: result.stats ?? null,
+            timedOut: Boolean(result.timedOut),
+        });
+    }
+
+    res.json({ success: true, data: result });
+}));
+
+router.post('/expire', asyncHandler(async (req, res) => {
+    const { value, error } = expireSchema.validate(req.body);
+    if (error) return res.status(400).json({ success: false, message: error.message });
+
+    const result = await gameService.expireSession(req.user.id, value.sessionId);
+    if (result.error) {
+        return res.status(result.status).json({
+            success: false,
+            message: result.error,
+            solution: result.solution ?? null,
+            stats: result.stats ?? null,
+            remainingMs: result.remainingMs ?? null,
+        });
+    }
 
     res.json({ success: true, data: result });
 }));

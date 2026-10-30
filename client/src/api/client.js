@@ -38,6 +38,7 @@ export const gameApi = {
     start: (mode = 'classic') => api.post('/api/game/start', { mode }).then((r) => r.data),
     answer: (sessionId, answer) =>
         api.post('/api/game/answer', { sessionId, answer }).then((r) => r.data),
+    expire: (sessionId) => api.post('/api/game/expire', { sessionId }).then((r) => r.data),
     stats: () => api.get('/api/game/stats').then((r) => r.data),
     modes: () => api.get('/api/game/modes').then((r) => r.data),
 };

@@ -30,10 +30,12 @@ import { useSound } from '../hooks/useSound.js';
 import { AchievementIcon } from '../lib/achievementIcons.jsx';
 import { TIER_STYLES } from '../lib/tiers.js';
 import { MODE_LIST, formatDate, formatRelative, getLevel, initials } from '../lib/format.js';
+import { usePageTitle } from '../hooks/usePageTitle.js';
 
 const MODE_ICONS = { classic: Banana, blitz: Timer, zen: Leaf };
 
 export default function DashboardPage() {
+    usePageTitle('Dashboard');
     const { user, stats } = useAuth();
     const navigate = useNavigate();
     const { play } = useSound();

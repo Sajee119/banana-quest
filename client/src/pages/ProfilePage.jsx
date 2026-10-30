@@ -39,6 +39,7 @@ import {
     formatRelative,
     initials,
 } from '../lib/format.js';
+import { usePageTitle } from '../hooks/usePageTitle.js';
 
 const inputClass =
     'w-full rounded-xl border-2 border-banana-200 bg-white px-3.5 py-2.5 font-semibold text-banana-900 placeholder:text-banana-400 focus:border-banana-400 focus:outline-none';
@@ -58,6 +59,7 @@ const METHOD_LABELS = {
 };
 
 export default function ProfilePage() {
+    usePageTitle('Account settings');
     const { user, stats, setUser } = useAuth();
 
     const [profile, setProfile] = useState({
@@ -220,7 +222,7 @@ export default function ProfilePage() {
                 <motion.div initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
                     <Card className="mb-5 !p-5 md:!p-6">
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex items-center gap-4">
+                            <div className="flex min-w-0 items-center gap-4">
                                 <div className="flex h-20 w-20 flex-shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-banana-300 bg-banana-100 font-display text-2xl font-extrabold text-banana-600 shadow-game-sm">
                                     {user.avatar ? (
                                         <img src={user.avatar} alt="" className="h-full w-full object-cover" />
@@ -228,11 +230,11 @@ export default function ProfilePage() {
                                         initials(user.displayName)
                                     )}
                                 </div>
-                                <div>
-                                    <h1 className="font-display text-3xl font-extrabold leading-tight text-banana-800">
+                                <div className="min-w-0">
+                                    <h1 className="break-words font-display text-3xl font-extrabold leading-tight text-banana-800">
                                         {user.displayName}
                                     </h1>
-                                    <p className="flex items-center gap-1.5 text-sm text-banana-600">
+                                    <p className="flex min-w-0 flex-wrap items-center gap-1.5 break-all text-sm text-banana-600">
                                         <Mail size={14} /> {user.email}
                                     </p>
                                     <div className="mt-2 flex flex-wrap gap-1.5">

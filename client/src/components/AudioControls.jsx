@@ -29,9 +29,11 @@ export default function AudioControls({ compact = false }) {
                 <IconToggle on={sfxEnabled} onClick={toggleMute} label="Toggle sound effects">
                     {sfxEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
                 </IconToggle>
-                <IconToggle on={musicEnabled} onClick={toggleMusic} label="Toggle music">
-                    {musicEnabled ? <AudioLines size={18} /> : <AudioLinesOff size={18} />}
-                </IconToggle>
+                <span className="hidden sm:contents">
+                    <IconToggle on={musicEnabled} onClick={toggleMusic} label="Toggle music">
+                        {musicEnabled ? <AudioLines size={18} /> : <AudioLinesOff size={18} />}
+                    </IconToggle>
+                </span>
             </div>
         );
     }

@@ -35,7 +35,9 @@ const gameLimiter = rateLimit({
   message: { success: false, message: 'Slow down! Too many game requests.' },
 });
 
-app.use('/auth', authLimiter);
+// Only credential endpoints are rate limited. Session checks (`/auth/status`)
+// run on every page load, so limiting them would sign active players out.
+app.use(['/auth/login', '/auth/register'], authLimiter);
 app.use('/api/game', gameLimiter);
 // Session
 app.use(

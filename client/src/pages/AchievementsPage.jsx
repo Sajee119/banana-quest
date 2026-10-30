@@ -7,6 +7,7 @@ import { useAuth } from '../context/auth-context.js';
 import { userApi } from '../api/client.js';
 import { AchievementIcon } from '../lib/achievementIcons.jsx';
 import { TIER_STYLES } from '../lib/tiers.js';
+import { usePageTitle } from '../hooks/usePageTitle.js';
 
 const FILTERS = [
     { id: 'all', label: 'All' },
@@ -15,6 +16,7 @@ const FILTERS = [
 ];
 
 export default function AchievementsPage() {
+    usePageTitle('Achievements');
     const { stats } = useAuth();
     const [achievements, setAchievements] = useState(null);
     const [summary, setSummary] = useState({ unlocked: 0, total: 0 });

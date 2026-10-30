@@ -131,7 +131,14 @@ Modes are defined in `server/src/config/gameModes.js` and exposed publicly via
   the puzzle image, time limit and mode.
 - `POST /api/game/answer` with `{ "sessionId", "answer" }` — scores the answer and
   returns the solution, points and updated stats.
+- `POST /api/game/expire` with `{ "sessionId" }` — ends a round whose timer ran
+  out. The round is recorded as a played loss and the solution is returned.
 - `GET /api/game/stats` — the signed-in player's stats.
+
+A round that times out still counts as a played game, so win rate and per-mode
+achievements stay accurate. The start response includes `serverNow` and
+`remainingMs`, which the client uses to keep its countdown aligned with the
+server clock.
 
 ### Scoring
 
