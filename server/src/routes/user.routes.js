@@ -167,26 +167,69 @@ router.get('/me/achievements', ensureAuthenticated, asyncHandler(async (req, res
 router.get('/leaderboard', async (req, res, next) => {
     try {
         const Score = require('../models/Score');
-        const limit = Math.min(parseInt(req.query.limit, 10) || 25, 100);
-        // Fetch extra rows so hidden profiles do not shorten the public board.
-        const top = await Score.find()
-            .sort({ totalPoints: -1 })
-            .limit(Math.min(limit * 3, 300))
-            .populate('user', 'firstName lastName email avatar preferences');
+        const requested = parseInt(req.query.limit, 10) || 25;
+        const limit = Math.min(Math.max(requested, 1), 100);
+        const currentUserId = req.user?.id ? String(req.user.id) : null;
+
+        // Fetch the whole visible board (bounded) so ranks and the signed-in
+        // player's position are consistent even when some profiles are hidden.
+        const rows = await Score.find()
+            .sort({ totalPoints: -1, gamesWon: -1, bestStreak: -1, updatedAt: 1 })
+            .limit(500)
+            .populate('user', 'firstName lastName avatar preferences');
+
+        const mapped = rows
+            .filter((score) => score.user)
+            .map((score) => ({ score, user: score.user }))
+            .filter(({ user }) => user.preferences?.showOnLeaderboard !== false)
+            .map(({ score, user }, idx) => {
+                const gamesPlayed = score.gamesPlayed || 0;
+                return {
+                    rank: idx + 1,
+                    displayName: user.displayName || 'Anonymous counter',
+                    avatar: user.avatar || null,
+                    totalPoints: score.totalPoints || 0,
+                    gamesPlayed,
+                    gamesWon: score.gamesWon || 0,
+                    bestStreak: score.bestStreak || 0,
+                    winRate: gamesPlayed ? Math.round((score.gamesWon / gamesPlayed) * 100) : 0,
+                    isCurrentUser: Boolean(currentUserId) && String(user._id) === currentUserId,
+                };
+            });
+
+        // The current player's position, including when they have hidden
+        // themselves from the public board.
+        let me = null;
+        if (currentUserId) {
+            const visibleMe = mapped.find((entry) => entry.isCurrentUser);
+            if (visibleMe) {
+                me = { ...visibleMe, hidden: false };
+            } else {
+                const ownRow = rows.find((score) => score.user && String(score.user._id) === currentUserId);
+                if (ownRow) {
+                    me = {
+                        rank: null,
+                        displayName: ownRow.user.displayName || 'You',
+                        avatar: ownRow.user.avatar || null,
+                        totalPoints: ownRow.totalPoints || 0,
+                        gamesPlayed: ownRow.gamesPlayed || 0,
+                        gamesWon: ownRow.gamesWon || 0,
+                        bestStreak: ownRow.bestStreak || 0,
+                        winRate: ownRow.gamesPlayed
+                            ? Math.round((ownRow.gamesWon / ownRow.gamesPlayed) * 100)
+                            : 0,
+                        isCurrentUser: true,
+                        hidden: true,
+                    };
+                }
+            }
+        }
 
         res.json({
             success: true,
-            data: top
-                .filter((s) => s.user && s.user.preferences?.showOnLeaderboard !== false)
-                .slice(0, limit)
-                .map((s, idx) => ({
-                    rank: idx + 1,
-                    displayName: s.user ? s.user.displayName : 'Unknown',
-                    avatar: s.user ? s.user.avatar : null,
-                    totalPoints: s.totalPoints,
-                    gamesWon: s.gamesWon,
-                    bestStreak: s.bestStreak,
-                })),
+            data: mapped.slice(0, limit),
+            me,
+            total: mapped.length,
         });
     } catch (err) {
         next(err);

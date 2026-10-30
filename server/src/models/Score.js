@@ -26,6 +26,9 @@ const scoreSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
+// Stable ordering for the public leaderboard.
+scoreSchema.index({ totalPoints: -1, gamesWon: -1, bestStreak: -1, updatedAt: 1 });
+
 // Add points & update streaks
 scoreSchema.statics.recordResult = async function (userId, { isCorrect, points, answerMs, mode }) {
     const score = await this.findOneAndUpdate(
