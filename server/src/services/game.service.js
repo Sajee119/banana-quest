@@ -2,9 +2,9 @@
 const GameSession = require('../models/GameSession');
 const Score = require('../models/Score');
 const { fetchPuzzle } = require('./banana.service');
+const { getMode, DEFAULT_MODE } = require('../config/gameModes');
 
 const env = require('../config/env');
-const SESSION_TTL_MS = env.GAME_SESSION_TTL_MS;
 const BASE_POINTS = env.GAME_BASE_POINTS;
 const FAST_BONUS_MAX = env.GAME_FAST_BONUS_MAX;
 const FAST_THRESHOLD_MS = env.GAME_FAST_THRESHOLD_MS;
@@ -14,12 +14,15 @@ const MAX_STREAK_MULTIPLIER = env.GAME_MAX_STREAK_MULTIPLIER;
 /**
  * Start a new game: fetch puzzle, hide solution, return only image.
  */
-async function startSession(userId) {
+async function startSession(userId, modeId = DEFAULT_MODE) {
+  const mode = getMode(modeId);
   const { imageUrl, solution } = await fetchPuzzle();
-  const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
+  const timeLimitMs = mode.timeLimitMs;
+  const expiresAt = new Date(Date.now() + timeLimitMs);
 
   const session = await GameSession.create({
     user: userId,
+    mode: mode.id,
     imageUrl,
     solution,
     expiresAt,
@@ -29,7 +32,14 @@ async function startSession(userId) {
     sessionId: session._id,
     imageUrl: session.imageUrl,
     expiresAt: session.expiresAt,
-    timeLimitMs: SESSION_TTL_MS,
+    timeLimitMs,
+    mode: {
+      id: mode.id,
+      label: mode.label,
+      tagline: mode.tagline,
+      pointsMultiplier: mode.pointsMultiplier,
+      speedBonus: mode.speedBonus,
+    },
   };
 }
 
@@ -57,14 +67,17 @@ async function submitAnswer(userId, sessionId, answer) {
 
     const isCorrect = Number(answer) === session.solution;
     const answerMs = Date.now() - session.createdAt.getTime();
+    const mode = getMode(session.mode);
 
     // ---- Scoring ----
     let points = 0;
     if (isCorrect) {
-        const speedBonus = Math.max(
-            0,
-            Math.round(FAST_BONUS_MAX * (1 - Math.min(answerMs, FAST_THRESHOLD_MS) / FAST_THRESHOLD_MS))
-        );
+        const speedBonus = mode.speedBonus
+            ? Math.max(
+                0,
+                Math.round(FAST_BONUS_MAX * (1 - Math.min(answerMs, FAST_THRESHOLD_MS) / FAST_THRESHOLD_MS))
+            )
+            : 0;
 
         const scoreDoc = await Score.findOne({ user: userId });
         const streak = scoreDoc ? scoreDoc.currentStreak : 0;
@@ -73,7 +86,7 @@ async function submitAnswer(userId, sessionId, answer) {
             1 + streak * STREAK_MULTIPLIER_STEP
         );
 
-        points = Math.round((BASE_POINTS + speedBonus) * streakMultiplier);
+        points = Math.round((BASE_POINTS + speedBonus) * streakMultiplier * mode.pointsMultiplier);
     }
 
     session.status = 'answered';
@@ -87,6 +100,7 @@ async function submitAnswer(userId, sessionId, answer) {
         isCorrect,
         points,
         answerMs,
+        mode: mode.id,
     });
 
     return {
@@ -95,12 +109,14 @@ async function submitAnswer(userId, sessionId, answer) {
         answerMs,
         solution: session.solution, // reveal only AFTER answering
         playerAnswer: session.playerAnswer,
+        mode: mode.id,
         stats: {
         totalPoints: score.totalPoints,
         gamesPlayed: score.gamesPlayed,
         gamesWon: score.gamesWon,
         currentStreak: score.currentStreak,
         bestStreak: score.bestStreak,
+        fastestAnswerMs: score.fastestAnswerMs,
         },
     };
 }

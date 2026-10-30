@@ -2,10 +2,20 @@ const router = require('express').Router();
 const Joi = require('joi');
 const { ensureAuthenticated } = require('../middleware/auth.middleware');
 const gameService = require('../services/game.service');
+const { listModes } = require('../config/gameModes');
 const asyncHandler = require('../utils/asyncHandler');
 
-// All game routes require auth
+// Public: the landing page and dashboard use this to render mode cards.
+router.get('/modes', (req, res) => {
+    res.json({ success: true, data: listModes() });
+});
+
+// All remaining game routes require auth
 router.use(ensureAuthenticated);
+
+const startSchema = Joi.object({
+    mode: Joi.string().valid('classic', 'blitz', 'zen').default('classic'),
+});
 
 const answerSchema = Joi.object({
     sessionId: Joi.string().hex().length(24).required(),
@@ -13,7 +23,10 @@ const answerSchema = Joi.object({
 });
 
 router.post('/start', asyncHandler(async (req, res) => {
-    const session = await gameService.startSession(req.user.id);
+    const { value, error } = startSchema.validate(req.body || {});
+    if (error) return res.status(400).json({ success: false, message: error.message });
+
+    const session = await gameService.startSession(req.user.id, value.mode);
     res.status(201).json({ success: true, data: session });
 }));
 

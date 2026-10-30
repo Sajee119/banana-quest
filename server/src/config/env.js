@@ -14,7 +14,6 @@ const schema = Joi.object({
     AUTH_CALLBACK_URL: Joi.string().uri().default('http://localhost:3000'),
     COOKIE_SECURE: Joi.boolean().default(false),
 
-    GAME_SESSION_TTL_MS: Joi.number().default(120000),
     GAME_BASE_POINTS: Joi.number().default(100),
     GAME_FAST_BONUS_MAX: Joi.number().default(50),
     GAME_FAST_THRESHOLD_MS: Joi.number().default(10000),

@@ -82,8 +82,8 @@ export default function LeaderboardPage() {
             </Card>
 
             <div className="text-center mt-6">
-            <Link to={user ? '/play' : '/login'}>
-                <Button className="!px-8">▶ {user ? 'Play Now' : 'Sign In to Play'}</Button>
+            <Link to={user ? '/dashboard' : '/login'}>
+                <Button className="!px-8">{user ? 'Dashboard' : 'Sign In to Play'}</Button>
             </Link>
             </div>
         </motion.div>

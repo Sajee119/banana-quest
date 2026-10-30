@@ -1,4 +1,4 @@
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import BananaLogo from '../components/BananaLogo.jsx';
@@ -22,7 +22,7 @@ export default function LoginPage() {
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        if (!loading && user) navigate('/play', { replace: true });
+        if (!loading && user) navigate('/dashboard', { replace: true });
     }, [user, loading, navigate]);
 
     const updateField = (field) => (event) => {
@@ -46,7 +46,7 @@ export default function LoginPage() {
             } else {
                 await signIn(() => authApi.login({ email: form.email, password: form.password }));
             }
-            navigate('/play', { replace: true });
+            navigate('/dashboard', { replace: true });
         } catch (err) {
             setError(err.friendlyMessage || 'Something went wrong. Please try again.');
         } finally {
@@ -62,7 +62,10 @@ export default function LoginPage() {
                 className="w-full max-w-md"
             >
                 <Card className="text-center">
-                    <BananaLogo size={100} className="mx-auto mb-4 animate-wiggle" />
+                    <BananaLogo size={100} className="mx-auto mb-3 animate-wiggle" />
+                    <p className="mb-1 font-display text-sm font-extrabold uppercase tracking-widest text-banana-500">
+                        Banana Quiz
+                    </p>
                     <h1 className="font-display text-4xl font-extrabold text-banana-800 mb-2">
                         Welcome, Player!
                     </h1>
@@ -197,6 +200,9 @@ export default function LoginPage() {
                     <p className="mt-6 text-xs text-banana-600">
                         Passwords are hashed and never stored in plain text.
                     </p>
+                    <Link to="/" className="mt-3 inline-block text-xs font-bold text-banana-600 underline hover:text-banana-800">
+                        ← Back to home
+                    </Link>
                 </Card>
             </motion.div>
         </div>

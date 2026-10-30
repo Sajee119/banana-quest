@@ -65,7 +65,7 @@ app.use(passport.session());
 
 // Routes
 app.get('/', (req, res) => {
-    res.json({ message: 'Banana Game API',endpoints: { auth: '/auth', user: '/api/users', game: '/api/game' } });
+    res.json({ message: 'Banana Quiz API', endpoints: { auth: '/auth', user: '/api/users', game: '/api/game' } });
 });
 app.use('/auth', authRoutes);
 app.use('/api/users', userRoutes);

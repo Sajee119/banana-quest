@@ -3,6 +3,7 @@ const passport = require('passport');
 const env = require('../config/env');
 const User = require('../models/User');
 const asyncHandler = require('../utils/asyncHandler');
+const { recordLogin } = require('../services/loginHistory.service');
 const { ensureGuest } = require('../middleware/auth.middleware');
 
 const authOptions = {
@@ -10,8 +11,8 @@ const authOptions = {
     failureMessage: true,
 };
 
-// Where the player lands after a successful OAuth login.
-const successRedirect = `${env.CLIENT_URL}/play`;
+// Where the player lands after a successful sign-in.
+const successRedirect = `${env.CLIENT_URL}/dashboard`;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -61,6 +62,7 @@ router.post('/register', asyncHandler(async (req, res) => {
 
     const user = await User.registerLocal({ name: displayName, email: normalizedEmail, password });
     await loginUser(req, user);
+    await recordLogin(req, user.id, 'register');
 
     return res.status(201).json({ success: true, user });
 }));
@@ -94,6 +96,7 @@ router.post('/login', asyncHandler(async (req, res) => {
     user.lastLoginAt = new Date();
     await user.save();
     await loginUser(req, user);
+    await recordLogin(req, user.id, 'password');
 
     return res.json({ success: true, user });
 }));
@@ -108,7 +111,10 @@ router.get(
 router.get(
     '/google/callback',
     passport.authenticate('google', authOptions),
-    (req, res) => res.redirect(successRedirect)
+    asyncHandler(async (req, res) => {
+        await recordLogin(req, req.user.id, 'google');
+        res.redirect(successRedirect);
+    })
 );
 
 // facebook auth
@@ -121,7 +127,10 @@ router.get(
 router.get(
     '/facebook/callback',
     passport.authenticate('facebook', authOptions),
-    (req, res) => res.redirect(successRedirect)
+    asyncHandler(async (req, res) => {
+        await recordLogin(req, req.user.id, 'facebook');
+        res.redirect(successRedirect);
+    })
 );
 
 // logout

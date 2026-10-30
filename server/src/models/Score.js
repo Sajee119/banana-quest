@@ -15,12 +15,19 @@ const scoreSchema = new mongoose.Schema(
         bestStreak: { type: Number, default: 0 },
         fastestAnswerMs: { type: Number, default: null },
         lastPlayedAt: { type: Date, default: null },
+        // Per-mode play counts. Stored here (not derived from GameSession)
+        // because sessions are TTL-deleted once they expire.
+        modePlays: {
+            classic: { type: Number, default: 0 },
+            blitz: { type: Number, default: 0 },
+            zen: { type: Number, default: 0 },
+        },
     },
     { timestamps: true }
 );
 
 // Add points & update streaks
-scoreSchema.statics.recordResult = async function (userId, { isCorrect, points, answerMs }) {
+scoreSchema.statics.recordResult = async function (userId, { isCorrect, points, answerMs, mode }) {
     const score = await this.findOneAndUpdate(
         { user: userId },
         { $setOnInsert: { user: userId } },
@@ -29,6 +36,13 @@ scoreSchema.statics.recordResult = async function (userId, { isCorrect, points, 
 
     score.gamesPlayed += 1;
     score.lastPlayedAt = new Date();
+
+    const modeKey = ['classic', 'blitz', 'zen'].includes(mode) ? mode : 'classic';
+    if (!score.modePlays) {
+        score.modePlays = { classic: 0, blitz: 0, zen: 0 };
+    }
+    score.modePlays[modeKey] = (score.modePlays[modeKey] || 0) + 1;
+    score.markModified('modePlays');
 
     if (isCorrect) {
         score.gamesWon += 1;

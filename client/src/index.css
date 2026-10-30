@@ -55,6 +55,42 @@
 
 html, body, #root { height: 100%; }
 
+html { scroll-behavior: smooth; }
+
+/* Account preference: calm the decorative animations. */
+html[data-reduced-motion='true'] .animate-wiggle,
+html[data-reduced-motion='true'] .animate-float,
+html[data-reduced-motion='true'] .animate-shine {
+  animation: none !important;
+}
+
+html[data-reduced-motion='true'] *,
+html[data-reduced-motion='true'] *::before,
+html[data-reduced-motion='true'] *::after {
+  scroll-behavior: auto !important;
+}
+
+/* Nicer range input for the volume control. */
+input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #d98500;
+  border: 2px solid #fffceb;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #d98500;
+  border: 2px solid #fffceb;
+  cursor: pointer;
+}
+
 body {
   @apply font-body bg-gradient-to-br from-banana-100 via-banana-50 to-amber-100 text-banana-900;
   background-attachment: fixed;

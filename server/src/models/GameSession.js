@@ -3,6 +3,12 @@ const mongoose = require('mongoose');
 const gameSessionSchema = new mongoose.Schema(
     {
         user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+        mode: {
+            type: String,
+            enum: ['classic', 'blitz', 'zen'],
+            default: 'classic',
+            index: true,
+        },
         imageUrl: { type: String, required: true },
         solution: { type: Number, required: true, select: false }, // never leaked by default
         status: {

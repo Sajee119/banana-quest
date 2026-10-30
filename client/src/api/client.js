@@ -26,15 +26,20 @@ export const authApi = {
 
 export const userApi = {
     me: () => api.get('/api/users/me').then((r) => r.data),
+    updateMe: (payload) => api.patch('/api/users/me', payload).then((r) => r.data),
+    changePassword: (payload) => api.patch('/api/users/me/password', payload).then((r) => r.data),
+    logins: () => api.get('/api/users/me/logins').then((r) => r.data),
+    achievements: () => api.get('/api/users/me/achievements').then((r) => r.data),
     leaderboard: (limit = 25) =>
         api.get(`/api/users/leaderboard?limit=${limit}`).then((r) => r.data),
 };
 
 export const gameApi = {
-    start: () => api.post('/api/game/start').then((r) => r.data),
+    start: (mode = 'classic') => api.post('/api/game/start', { mode }).then((r) => r.data),
     answer: (sessionId, answer) =>
         api.post('/api/game/answer', { sessionId, answer }).then((r) => r.data),
     stats: () => api.get('/api/game/stats').then((r) => r.data),
+    modes: () => api.get('/api/game/modes').then((r) => r.data),
 };
 
 export default api;

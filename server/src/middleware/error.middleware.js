@@ -23,13 +23,18 @@ function errorHandler(err, req, res, _next) {
         message = 'Game service temporarily unavailable. Please try again.';
     } else if (err instanceof mongoose.Error.ValidationError) {
         status = 400;
-        message = 'Validation failed: ' + Object.values(err.errors).map((e) => e.message).join(', ');
+        message = Object.values(err.errors)
+            .map((e) => (e.kind === 'required' ? `${e.path} is required.` : e.message))
+            .join(' ');
     } else if (err instanceof mongoose.Error.CastError) {
         status = 400;
         message = `Invalid ${err.path}: ${err.value}`;
     } else if (err.code === 11000) {
         status = 409;
-        message = `Duplicate value for field: ${Object.keys(err.keyValue || {}).join(', ')}`;
+        const fields = Object.keys(err.keyValue || {});
+        message = fields.includes('email')
+            ? 'An account with this email already exists. Try signing in.'
+            : `That value is already in use${fields.length ? ` (${fields.join(', ')})` : ''}.`;
     }
 
     const body = { success: false, message };

@@ -12,19 +12,36 @@ const userSchema = new mongoose.Schema(
             lowercase: true,
             trim: true
         },
+        // Names are optional: social providers do not always return a family
+        // name, and single-word sign-ups have no last name at all.
         firstName: {
             type: String,
-            required: true,
+            trim: true,
             default: ''
         },
         lastName: {
             type: String,
-            required: true,
+            trim: true,
             default: ''
         },
         avatar: {
             type: String,
             default: null
+        },
+        bio: {
+            type: String,
+            trim: true,
+            maxlength: 160,
+            default: ''
+        },
+        favoriteMode: {
+            type: String,
+            enum: ['classic', 'blitz', 'zen'],
+            default: 'classic'
+        },
+        preferences: {
+            reducedMotion: { type: Boolean, default: false },
+            showOnLeaderboard: { type: Boolean, default: true },
         },
         providers: [
             {
@@ -89,6 +106,12 @@ userSchema.virtual('providerNames').get(function () {
 
 userSchema.methods.setPassword = async function (password) {
     this.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+};
+
+userSchema.methods.setDisplayName = function (name) {
+    const parts = String(name).trim().split(/\s+/).filter(Boolean);
+    this.firstName = parts[0] || '';
+    this.lastName = parts.slice(1).join(' ');
 };
 
 userSchema.methods.comparePassword = function (password) {
