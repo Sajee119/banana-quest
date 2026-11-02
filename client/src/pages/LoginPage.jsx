@@ -4,8 +4,6 @@ import { motion } from 'framer-motion';
 import {
     ArrowLeft,
     Award,
-    Eye,
-    EyeOff,
     Flame,
     ShieldCheck,
     Sparkles,
@@ -13,9 +11,12 @@ import {
 } from 'lucide-react';
 import BananaLogo from '../components/BananaLogo.jsx';
 import Card from '../components/Card.jsx';
+import PasswordInput from '../components/PasswordInput.jsx';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter.jsx';
 import { authApi } from '../api/client.js';
 import { useAuth } from '../context/auth-context.js';
 import { usePageTitle } from '../hooks/usePageTitle.js';
+import { evaluatePassword } from '../lib/passwordStrength.js';
 
 const inputClass =
     'w-full rounded-2xl border-2 border-banana-200 bg-white px-4 py-3 font-semibold text-banana-900 placeholder:text-banana-400 focus:border-banana-400 focus:outline-none';
@@ -84,9 +85,19 @@ export default function LoginPage() {
 
         setError('');
 
-        if (mode === 'register' && form.password !== form.confirmPassword) {
-            setError('The passwords do not match. Please re-enter them.');
-            return;
+        if (mode === 'register') {
+            const policy = evaluatePassword(form.password, {
+                email: form.email,
+                name: form.name,
+            });
+            if (!policy.valid) {
+                setError(policy.message);
+                return;
+            }
+            if (form.password !== form.confirmPassword) {
+                setError('The passwords do not match. Please re-enter them.');
+                return;
+            }
         }
 
         setSubmitting(true);
@@ -271,7 +282,7 @@ export default function LoginPage() {
                                 />
                             </div>
 
-                            <PasswordField
+                            <PasswordInput
                                 id="password"
                                 label="Password"
                                 value={form.password}
@@ -281,18 +292,41 @@ export default function LoginPage() {
                                 placeholder={
                                     isRegister ? 'At least 8 characters' : 'Your password'
                                 }
+                                labelAction={
+                                    !isRegister ? (
+                                        <Link
+                                            to="/forgot-password"
+                                            className="text-xs font-bold text-banana-600 underline hover:text-banana-800"
+                                        >
+                                            Forgot password?
+                                        </Link>
+                                    ) : null
+                                }
                             />
 
                             {isRegister && (
-                                <PasswordField
-                                    id="confirmPassword"
-                                    label="Confirm password"
-                                    value={form.confirmPassword}
-                                    onChange={updateField('confirmPassword')}
-                                    autoComplete="new-password"
-                                    minLength={8}
-                                    placeholder="Repeat your password"
-                                />
+                                <>
+                                    <PasswordStrengthMeter
+                                        password={form.password}
+                                        email={form.email}
+                                        name={form.name}
+                                    />
+                                    <PasswordInput
+                                        id="confirmPassword"
+                                        label="Confirm password"
+                                        value={form.confirmPassword}
+                                        onChange={updateField('confirmPassword')}
+                                        autoComplete="new-password"
+                                        minLength={8}
+                                        placeholder="Repeat your password"
+                                    />
+                                    {form.confirmPassword.length > 0 &&
+                                        form.password !== form.confirmPassword && (
+                                            <p className="text-xs font-semibold text-red-600">
+                                                The passwords do not match yet.
+                                            </p>
+                                        )}
+                                </>
                             )}
 
                             <button
@@ -349,42 +383,6 @@ export default function LoginPage() {
                         </Link>
                     </Card>
                 </motion.div>
-            </div>
-        </div>
-    );
-}
-
-function PasswordField({ id, label, value, onChange, autoComplete, minLength, placeholder }) {
-    const [visible, setVisible] = useState(false);
-
-    return (
-        <div>
-            <label htmlFor={id} className="mb-1 block text-sm font-bold text-banana-700">
-                {label}
-            </label>
-            <div className="relative">
-                <input
-                    id={id}
-                    name={id}
-                    type={visible ? 'text' : 'password'}
-                    required
-                    minLength={minLength}
-                    maxLength={72}
-                    autoComplete={autoComplete}
-                    placeholder={placeholder}
-                    value={value}
-                    onChange={onChange}
-                    className={`${inputClass} pr-12`}
-                />
-                <button
-                    type="button"
-                    onClick={() => setVisible((current) => !current)}
-                    aria-label={visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
-                    title={visible ? 'Hide password' : 'Show password'}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-banana-500 transition hover:bg-banana-100 hover:text-banana-700"
-                >
-                    {visible ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
             </div>
         </div>
     );

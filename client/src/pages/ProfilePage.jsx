@@ -24,12 +24,17 @@ import {
     Image,
     UserRound,
     ListChecks,
+    LogOut,
+    ShieldAlert,
+    Activity,
 } from 'lucide-react';
 import AppHeader from '../components/AppHeader.jsx';
 import Card from '../components/Card.jsx';
 import Button from '../components/Button.jsx';
 import AudioControls from '../components/AudioControls.jsx';
 import StatCard from '../components/StatCard.jsx';
+import PasswordInput from '../components/PasswordInput.jsx';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter.jsx';
 import { useAuth } from '../context/auth-context.js';
 import { userApi } from '../api/client.js';
 import {
@@ -39,6 +44,7 @@ import {
     formatRelative,
     initials,
 } from '../lib/format.js';
+import { evaluatePassword } from '../lib/passwordStrength.js';
 import { usePageTitle } from '../hooks/usePageTitle.js';
 
 const inputClass =
@@ -56,6 +62,12 @@ const METHOD_LABELS = {
     register: 'Sign-up',
     google: 'Google',
     facebook: 'Facebook',
+};
+
+const REASON_LABELS = {
+    unknown_email: 'Unknown email',
+    wrong_password: 'Wrong password',
+    social_only: 'Social-only account',
 };
 
 export default function ProfilePage() {
@@ -88,38 +100,78 @@ export default function ProfilePage() {
     const [loginError, setLoginError] = useState('');
     const [loadingLogins, setLoadingLogins] = useState(true);
 
+    const [security, setSecurity] = useState(null);
+    const [securityError, setSecurityError] = useState('');
+    const [loadingSecurity, setLoadingSecurity] = useState(true);
+    const [signingOutOthers, setSigningOutOthers] = useState(false);
+    const [deviceMessage, setDeviceMessage] = useState(null);
+
     const hasPassword = user?.providerNames?.includes('local');
     const winRate = stats?.gamesPlayed
         ? Math.round((stats.gamesWon / stats.gamesPlayed) * 100)
         : 0;
 
-    const loadLogins = () => {
+    const fetchSecurity = () => {
+        Promise.allSettled([userApi.security(), userApi.logins()])
+            .then(([securityResult, loginResult]) => {
+                if (securityResult.status === 'fulfilled') {
+                    setSecurity(securityResult.value.security);
+                } else {
+                    setSecurityError(
+                        securityResult.reason?.friendlyMessage ||
+                            'Could not load your security overview.'
+                    );
+                }
+
+                if (loginResult.status === 'fulfilled') {
+                    setLoginData(loginResult.value);
+                } else {
+                    setLoginError(
+                        loginResult.reason?.friendlyMessage ||
+                            'Could not load login history.'
+                    );
+                }
+            })
+            .finally(() => {
+                setLoadingLogins(false);
+                setLoadingSecurity(false);
+            });
+    };
+
+    const loadSecurity = () => {
         setLoadingLogins(true);
+        setLoadingSecurity(true);
         setLoginError('');
-        userApi
-            .logins()
-            .then((data) => setLoginData(data))
-            .catch((err) => setLoginError(err.friendlyMessage || 'Could not load login history.'))
-            .finally(() => setLoadingLogins(false));
+        setSecurityError('');
+        fetchSecurity();
     };
 
     useEffect(() => {
-        let active = true;
-        userApi
-            .logins()
-            .then((data) => {
-                if (active) setLoginData(data);
-            })
-            .catch((err) => {
-                if (active) setLoginError(err.friendlyMessage || 'Could not load login history.');
-            })
-            .finally(() => {
-                if (active) setLoadingLogins(false);
-            });
-        return () => {
-            active = false;
-        };
+        fetchSecurity();
     }, []);
+
+    const handleLogoutOthers = async () => {
+        if (signingOutOthers) return;
+        setSigningOutOthers(true);
+        setDeviceMessage(null);
+
+        try {
+            const data = await userApi.logoutOthers();
+            if (data.user) setUser(data.user);
+            setDeviceMessage({
+                type: 'success',
+                text: data.message || 'All other devices have been signed out.',
+            });
+            loadSecurity();
+        } catch (err) {
+            setDeviceMessage({
+                type: 'error',
+                text: err.friendlyMessage || 'Could not sign out your other devices.',
+            });
+        } finally {
+            setSigningOutOthers(false);
+        }
+    };
 
     const updateProfileField = (field) => (event) => {
         setProfile((prev) => ({ ...prev, [field]: event.target.value }));
@@ -169,6 +221,15 @@ export default function ProfilePage() {
             return;
         }
 
+        const policy = evaluatePassword(passwordForm.newPassword, {
+            email: user?.email,
+            name: user?.displayName,
+        });
+        if (!policy.valid) {
+            setPasswordMessage({ type: 'error', text: policy.message });
+            return;
+        }
+
         setSavingPassword(true);
         try {
             const data = await userApi.changePassword({
@@ -184,6 +245,14 @@ export default function ProfilePage() {
             setSavingPassword(false);
         }
     };
+
+    const failedLogins = useMemo(
+        () =>
+            (loginData?.history || [])
+                .filter((entry) => entry.success === false)
+                .slice(0, 4),
+        [loginData]
+    );
 
     const statCards = useMemo(
         () => [
@@ -392,54 +461,68 @@ export default function ProfilePage() {
 
                                 <form onSubmit={handlePasswordSave} className="space-y-4">
                                     {hasPassword && (
-                                        <Field label="Current password" htmlFor="currentPassword">
-                                            <input
-                                                id="currentPassword"
-                                                type="password"
-                                                autoComplete="current-password"
-                                                value={passwordForm.currentPassword}
-                                                onChange={(event) =>
-                                                    setPasswordForm((prev) => ({ ...prev, currentPassword: event.target.value }))
-                                                }
-                                                className={inputClass}
-                                                placeholder="Current password"
-                                            />
-                                        </Field>
+                                        <PasswordInput
+                                            id="currentPassword"
+                                            label="Current password"
+                                            value={passwordForm.currentPassword}
+                                            onChange={(event) =>
+                                                setPasswordForm((prev) => ({
+                                                    ...prev,
+                                                    currentPassword: event.target.value,
+                                                }))
+                                            }
+                                            autoComplete="current-password"
+                                            maxLength={72}
+                                            placeholder="Current password"
+                                            inputClassName={inputClass}
+                                        />
                                     )}
                                     <div className="grid gap-4 sm:grid-cols-2">
-                                        <Field label="New password" htmlFor="newPassword">
-                                            <input
-                                                id="newPassword"
-                                                type="password"
-                                                autoComplete="new-password"
-                                                value={passwordForm.newPassword}
-                                                onChange={(event) =>
-                                                    setPasswordForm((prev) => ({ ...prev, newPassword: event.target.value }))
-                                                }
-                                                minLength={8}
-                                                maxLength={72}
-                                                required
-                                                className={inputClass}
-                                                placeholder="At least 8 characters"
-                                            />
-                                        </Field>
-                                        <Field label="Confirm new password" htmlFor="confirmPassword">
-                                            <input
-                                                id="confirmPassword"
-                                                type="password"
-                                                autoComplete="new-password"
-                                                value={passwordForm.confirmPassword}
-                                                onChange={(event) =>
-                                                    setPasswordForm((prev) => ({ ...prev, confirmPassword: event.target.value }))
-                                                }
-                                                minLength={8}
-                                                maxLength={72}
-                                                required
-                                                className={inputClass}
-                                                placeholder="Repeat new password"
-                                            />
-                                        </Field>
+                                        <PasswordInput
+                                            id="newPassword"
+                                            label="New password"
+                                            value={passwordForm.newPassword}
+                                            onChange={(event) =>
+                                                setPasswordForm((prev) => ({
+                                                    ...prev,
+                                                    newPassword: event.target.value,
+                                                }))
+                                            }
+                                            autoComplete="new-password"
+                                            minLength={8}
+                                            placeholder="At least 8 characters"
+                                            inputClassName={inputClass}
+                                        />
+                                        <PasswordInput
+                                            id="confirmPassword"
+                                            label="Confirm new password"
+                                            value={passwordForm.confirmPassword}
+                                            onChange={(event) =>
+                                                setPasswordForm((prev) => ({
+                                                    ...prev,
+                                                    confirmPassword: event.target.value,
+                                                }))
+                                            }
+                                            autoComplete="new-password"
+                                            minLength={8}
+                                            placeholder="Repeat new password"
+                                            inputClassName={inputClass}
+                                        />
                                     </div>
+
+                                    <PasswordStrengthMeter
+                                        password={passwordForm.newPassword}
+                                        email={user?.email}
+                                        name={user?.displayName}
+                                    />
+
+                                    {passwordForm.confirmPassword.length > 0 &&
+                                        passwordForm.newPassword !==
+                                            passwordForm.confirmPassword && (
+                                            <p className="text-xs font-semibold text-red-600">
+                                                The new passwords do not match yet.
+                                            </p>
+                                        )}
 
                                     {passwordMessage && <Message {...passwordMessage} />}
 
@@ -457,16 +540,21 @@ export default function ProfilePage() {
                                     <SectionHeading
                                         icon={<ListChecks size={20} />}
                                         title="Login history"
-                                        subtitle="Recent sign-ins and the devices used."
+                                        subtitle="Every recent sign-in attempt, including failed ones."
                                         noMargin
                                     />
                                     <button
                                         type="button"
-                                        onClick={loadLogins}
-                                        title="Refresh login history"
+                                        onClick={loadSecurity}
+                                        title="Refresh security details"
                                         className="rounded-xl p-2 text-banana-600 hover:bg-banana-100"
                                     >
-                                        <RefreshCw size={17} className={loadingLogins ? 'animate-spin' : ''} />
+                                        <RefreshCw
+                                            size={17}
+                                            className={
+                                                loadingLogins || loadingSecurity ? 'animate-spin' : ''
+                                            }
+                                        />
                                     </button>
                                 </div>
 
@@ -485,22 +573,35 @@ export default function ProfilePage() {
                                 <ul className="divide-y divide-banana-100">
                                     {loginData?.history.map((entry) => {
                                         const Icon = DEVICE_ICONS[entry.deviceType] || Monitor;
+                                        const failed = entry.success === false;
                                         return (
                                             <li key={entry.id} className="flex items-center gap-3 py-3">
-                                                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-banana-100 text-banana-700">
+                                                <div
+                                                    className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${
+                                                        failed
+                                                            ? 'bg-red-50 text-red-600'
+                                                            : 'bg-banana-100 text-banana-700'
+                                                    }`}
+                                                >
                                                     <Icon size={18} />
                                                 </div>
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="truncate text-sm font-bold text-banana-800">
-                                                        {entry.device}
+                                                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-bold text-banana-800">
+                                                        <span className="truncate">{entry.device}</span>
                                                         {entry.current && (
-                                                            <span className="ml-2 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold uppercase text-emerald-700">
+                                                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-extrabold uppercase text-emerald-700">
                                                                 This device
                                                             </span>
                                                         )}
+                                                        {failed && (
+                                                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-extrabold uppercase text-red-700">
+                                                                {REASON_LABELS[entry.reason] || 'Failed'}
+                                                            </span>
+                                                        )}
                                                     </p>
-                                                    <p className="text-xs text-banana-500">
-                                                        {METHOD_LABELS[entry.method] || entry.method} · {entry.ip} ·{' '}
+                                                    <p className="break-words text-xs text-banana-500">
+                                                        {METHOD_LABELS[entry.method] || entry.method} ·{' '}
+                                                        {entry.email || user.email} · {entry.ip} ·{' '}
                                                         {formatDateTime(entry.at)}
                                                     </p>
                                                 </div>
@@ -513,6 +614,134 @@ export default function ProfilePage() {
 
                         {/* Right column */}
                         <div className="space-y-5">
+                            <Card className="!p-5">
+                                <SectionHeading
+                                    icon={<ShieldCheck size={20} />}
+                                    title="Account security"
+                                    subtitle="Live checks on how protected your account is."
+                                    noMargin
+                                />
+
+                                {loadingSecurity && !security && (
+                                    <p className="py-4 text-center text-xs font-semibold text-banana-500">
+                                        Checking your account…
+                                    </p>
+                                )}
+
+                                {securityError && (
+                                    <div className="mt-3">
+                                        <Message type="error" text={securityError} />
+                                    </div>
+                                )}
+
+                                {security && (
+                                    <>
+                                        <div className="mt-3 flex items-center gap-3">
+                                            <div
+                                                className={`flex h-16 w-16 flex-shrink-0 flex-col items-center justify-center rounded-2xl ${
+                                                    security.score >= 75
+                                                        ? 'bg-emerald-100 text-emerald-700'
+                                                        : security.score >= 50
+                                                          ? 'bg-amber-100 text-amber-700'
+                                                          : 'bg-red-100 text-red-700'
+                                                }`}
+                                            >
+                                                <span className="font-display text-xl font-extrabold leading-none">
+                                                    {security.score}%
+                                                </span>
+                                                <span className="mt-0.5 text-[9px] font-bold uppercase tracking-wide">
+                                                    secure
+                                                </span>
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-extrabold text-banana-800">
+                                                    {security.level}
+                                                </p>
+                                                <p className="text-[11px] text-banana-500">
+                                                    {security.checks.filter((check) => check.passed).length}/
+                                                    {security.checks.length} checks passed
+                                                </p>
+                                                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-banana-200">
+                                                    <div
+                                                        className={`h-full rounded-full ${
+                                                            security.score >= 75
+                                                                ? 'bg-emerald-500'
+                                                                : security.score >= 50
+                                                                  ? 'bg-amber-400'
+                                                                  : 'bg-red-500'
+                                                        }`}
+                                                        style={{ width: `${security.score}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <ul className="mt-3 space-y-1.5">
+                                            {security.checks.map((check) => (
+                                                <li
+                                                    key={check.id}
+                                                    title={check.hint}
+                                                    className="flex items-start gap-2 text-[11px] font-semibold"
+                                                >
+                                                    {check.passed ? (
+                                                        <Check
+                                                            size={14}
+                                                            className="mt-0.5 flex-shrink-0 text-emerald-600"
+                                                        />
+                                                    ) : (
+                                                        <CircleAlert
+                                                            size={14}
+                                                            className="mt-0.5 flex-shrink-0 text-amber-500"
+                                                        />
+                                                    )}
+                                                    <span
+                                                        className={
+                                                            check.passed
+                                                                ? 'text-emerald-700'
+                                                                : 'text-banana-600'
+                                                        }
+                                                    >
+                                                        {check.label}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+
+                                        <div className="mt-3 space-y-0.5 border-t border-banana-100 pt-2.5 text-[11px] text-banana-500">
+                                            <p className="flex items-center gap-1.5">
+                                                <Activity size={12} />
+                                                Last sign-in:{' '}
+                                                <span className="font-bold text-banana-700">
+                                                    {formatRelative(security.lastSuccessAt)}
+                                                </span>
+                                            </p>
+                                            <p className="flex items-center gap-1.5">
+                                                <ShieldAlert size={12} />
+                                                Failed attempts:{' '}
+                                                <span className="font-bold text-banana-700">
+                                                    {security.failedLogins}
+                                                </span>
+                                            </p>
+                                        </div>
+                                    </>
+                                )}
+
+                                <Button
+                                    variant="secondary"
+                                    onClick={handleLogoutOthers}
+                                    disabled={signingOutOthers}
+                                    className="mt-4 w-full !py-2.5 !text-base"
+                                >
+                                    <LogOut size={17} />{' '}
+                                    {signingOutOthers ? 'Signing out…' : 'Sign out other devices'}
+                                </Button>
+                                {deviceMessage && (
+                                    <div className="mt-3">
+                                        <Message {...deviceMessage} />
+                                    </div>
+                                )}
+                            </Card>
+
                             <Card className="!p-5">
                                 <SectionHeading icon={<CalendarDays size={20} />} title="Devices" subtitle="Where you are signed in." noMargin />
                                 <div className="mt-3 space-y-2">
@@ -539,6 +768,37 @@ export default function ProfilePage() {
                                     {loginData && loginData.devices.length === 0 && (
                                         <p className="py-3 text-center text-xs font-semibold text-banana-500">No devices yet.</p>
                                     )}
+                                </div>
+                            </Card>
+
+                            <Card className="!p-5">
+                                <SectionHeading
+                                    icon={<ShieldAlert size={20} />}
+                                    title="Failed sign-ins"
+                                    subtitle="Recent attempts that did not get in."
+                                    noMargin
+                                />
+                                <div className="mt-3 space-y-2">
+                                    {failedLogins.length === 0 && (
+                                        <p className="py-2 text-center text-xs font-semibold text-banana-500">
+                                            No failed attempts recorded. Nice and quiet.
+                                        </p>
+                                    )}
+                                    {failedLogins.map((entry) => (
+                                        <div
+                                            key={`failed-${entry.id}`}
+                                            className="rounded-xl border-2 border-red-100 bg-red-50/60 p-2.5"
+                                        >
+                                            <p className="flex items-center gap-2 text-xs font-bold text-red-700">
+                                                <ShieldAlert size={14} className="flex-shrink-0" />
+                                                {REASON_LABELS[entry.reason] || 'Sign-in failed'}
+                                            </p>
+                                            <p className="mt-0.5 break-words text-[11px] text-banana-500">
+                                                {entry.email || user.email} · {entry.ip} ·{' '}
+                                                {formatRelative(entry.at)}
+                                            </p>
+                                        </div>
+                                    ))}
                                 </div>
                             </Card>
 

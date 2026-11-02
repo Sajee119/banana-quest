@@ -1,15 +1,23 @@
 const mongoose = require('mongoose');
 
 /**
- * One record per successful sign-in. Used by the account page to show the
- * player's recent login history and the devices they have used.
+ * One record per sign-in attempt (successful or failed). Used by the account
+ * page to show recent login history, failed attempts and known devices.
+ * Failed attempts for unknown emails have no `user`, so only the email is kept.
  */
 const loginEventSchema = new mongoose.Schema(
     {
         user: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
-            required: true,
+            default: null,
+            index: true,
+        },
+        email: {
+            type: String,
+            lowercase: true,
+            trim: true,
+            default: '',
             index: true,
         },
         method: {
@@ -17,6 +25,12 @@ const loginEventSchema = new mongoose.Schema(
             enum: ['password', 'google', 'facebook', 'register'],
             required: true,
         },
+        success: {
+            type: Boolean,
+            default: true,
+            index: true,
+        },
+        reason: { type: String, default: '' },
         ip: { type: String, default: '' },
         userAgent: { type: String, default: '' },
         browser: { type: String, default: 'Unknown browser' },
@@ -34,5 +48,6 @@ const loginEventSchema = new mongoose.Schema(
 );
 
 loginEventSchema.index({ user: 1, createdAt: -1 });
+loginEventSchema.index({ email: 1, createdAt: -1 });
 
 module.exports = mongoose.model('LoginEvent', loginEventSchema);

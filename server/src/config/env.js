@@ -14,6 +14,17 @@ const schema = Joi.object({
     AUTH_CALLBACK_URL: Joi.string().uri().default('http://localhost:3000'),
     COOKIE_SECURE: Joi.boolean().default(false),
 
+    // Password reset + optional SMTP delivery. When SMTP is not configured,
+    // reset links are only logged (and returned in non-production) so local
+    // development still works without an email provider.
+    PASSWORD_RESET_TTL_MINUTES: Joi.number().min(5).max(120).default(30),
+    SMTP_HOST: Joi.string().allow('').default(''),
+    SMTP_PORT: Joi.number().default(587),
+    SMTP_SECURE: Joi.boolean().default(false),
+    SMTP_USER: Joi.string().allow('').default(''),
+    SMTP_PASS: Joi.string().allow('').default(''),
+    MAIL_FROM: Joi.string().default('Banana Quiz <no-reply@bananaquiz.local>'),
+
     GAME_BASE_POINTS: Joi.number().default(100),
     GAME_FAST_BONUS_MAX: Joi.number().default(50),
     GAME_FAST_THRESHOLD_MS: Joi.number().default(10000),

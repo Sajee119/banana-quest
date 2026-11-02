@@ -3,6 +3,7 @@ const { parseUserAgent, getClientIp, hashSessionId } = require('../utils/userAge
 const logger = require('../utils/logger');
 
 const MAX_EVENTS_PER_USER = 50;
+const MAX_EVENTS_PER_EMAIL = 20;
 
 function maskIp(ip = '') {
     if (!ip) return 'Unknown';
@@ -22,18 +23,25 @@ function maskIp(ip = '') {
 }
 
 /**
- * Store a login event. Never throws: login must still succeed if history
- * logging fails.
+ * Store a sign-in attempt. Never throws: login must still succeed if history
+ * logging fails. Failed attempts for unknown emails are stored without a
+ * `user`, so they cannot be linked to an account.
  */
-async function recordLogin(req, userId, method) {
-    if (!userId) return null;
+async function recordLogin(
+    req,
+    { userId = null, email = '', method, success = true, reason = '' }
+) {
     try {
         const userAgent = req?.headers?.['user-agent'] || '';
         const info = parseUserAgent(userAgent);
+        const normalizedEmail = String(email || '').trim().toLowerCase();
 
         const event = await LoginEvent.create({
-            user: userId,
+            user: userId || null,
+            email: normalizedEmail,
             method,
+            success,
+            reason,
             ip: getClientIp(req),
             userAgent,
             browser: info.browser,
@@ -42,10 +50,13 @@ async function recordLogin(req, userId, method) {
             sessionKey: hashSessionId(req?.sessionID),
         });
 
-        // Keep the collection bounded per player.
-        const stale = await LoginEvent.find({ user: userId })
+        // Keep the collection bounded per player (or per email for failures
+        // that could not be linked to an account).
+        const filter = userId ? { user: userId } : { email: normalizedEmail };
+        const limit = userId ? MAX_EVENTS_PER_USER : MAX_EVENTS_PER_EMAIL;
+        const stale = await LoginEvent.find(filter)
             .sort({ createdAt: -1 })
-            .skip(MAX_EVENTS_PER_USER)
+            .skip(limit)
             .select('_id')
             .lean();
         if (stale.length > 0) {
@@ -68,7 +79,10 @@ async function getLoginHistory(userId, sessionId) {
 
     const history = events.map((event) => ({
         id: event._id,
+        email: event.email || '',
         method: event.method,
+        success: event.success !== false,
+        reason: event.reason || '',
         browser: event.browser,
         os: event.os,
         deviceType: event.deviceType,
@@ -78,36 +92,51 @@ async function getLoginHistory(userId, sessionId) {
         at: event.createdAt,
     }));
 
+    // Devices only come from successful sign-ins; a failed attempt is not a
+    // device that is currently signed in.
     const deviceMap = new Map();
-    events.forEach((event) => {
-        const key = `${event.browser}|${event.os}|${event.deviceType}`;
-        const existing = deviceMap.get(key);
-        const isCurrent = Boolean(currentKey) && event.sessionKey === currentKey;
+    events
+        .filter((event) => event.success !== false)
+        .forEach((event) => {
+            const key = `${event.browser}|${event.os}|${event.deviceType}`;
+            const existing = deviceMap.get(key);
+            const isCurrent = Boolean(currentKey) && event.sessionKey === currentKey;
 
-        if (!existing) {
-            deviceMap.set(key, {
-                id: key,
-                device: `${event.browser} on ${event.os}`,
-                browser: event.browser,
-                os: event.os,
-                deviceType: event.deviceType,
-                firstSeenAt: event.createdAt,
-                lastSeenAt: event.createdAt,
-                logins: 1,
-                current: isCurrent,
-            });
-        } else {
-            existing.logins += 1;
-            existing.current = existing.current || isCurrent;
-            if (event.createdAt < existing.firstSeenAt) existing.firstSeenAt = event.createdAt;
-        }
-    });
+            if (!existing) {
+                deviceMap.set(key, {
+                    id: key,
+                    device: `${event.browser} on ${event.os}`,
+                    browser: event.browser,
+                    os: event.os,
+                    deviceType: event.deviceType,
+                    firstSeenAt: event.createdAt,
+                    lastSeenAt: event.createdAt,
+                    logins: 1,
+                    current: isCurrent,
+                });
+            } else {
+                existing.logins += 1;
+                existing.current = existing.current || isCurrent;
+                if (event.createdAt < existing.firstSeenAt) existing.firstSeenAt = event.createdAt;
+                if (event.createdAt > existing.lastSeenAt) existing.lastSeenAt = event.createdAt;
+            }
+        });
+
+    const successful = events.filter((event) => event.success !== false);
+    const failed = events.filter((event) => event.success === false);
 
     return {
         history,
         devices: Array.from(deviceMap.values()).sort(
             (a, b) => new Date(b.lastSeenAt) - new Date(a.lastSeenAt)
         ),
+        summary: {
+            total: events.length,
+            successful: successful.length,
+            failed: failed.length,
+            lastSuccessAt: successful[0]?.createdAt || null,
+            lastFailedAt: failed[0]?.createdAt || null,
+        },
     };
 }
 

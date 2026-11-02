@@ -69,6 +69,16 @@ const userSchema = new mongoose.Schema(
             select: false,
             default: null
         },
+        passwordChangedAt: {
+            type: Date,
+            default: null
+        },
+        // Incremented whenever the password changes or the player signs out
+        // other devices. Sessions with an older version are rejected.
+        authVersion: {
+            type: Number,
+            default: 0
+        },
         isActive: {
             type: Boolean,
             default: true
@@ -80,6 +90,7 @@ const userSchema = new mongoose.Schema(
             virtuals: true,
             transform: (_doc, ret) => {
                 delete ret.passwordHash;
+                delete ret.authVersion;
                 return ret;
             }
         },
@@ -106,6 +117,7 @@ userSchema.virtual('providerNames').get(function () {
 
 userSchema.methods.setPassword = async function (password) {
     this.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    this.passwordChangedAt = new Date();
 };
 
 userSchema.methods.setDisplayName = function (name) {

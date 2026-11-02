@@ -5,6 +5,8 @@ const { ensureAuthenticated } = require('../middleware/auth.middleware');
 const gameService = require('../services/game.service');
 const { evaluateAchievements } = require('../services/achievement.service');
 const { getLoginHistory } = require('../services/loginHistory.service');
+const { sendPasswordChangedEmail } = require('../services/mail.service');
+const { evaluatePassword } = require('../utils/passwordPolicy');
 const asyncHandler = require('../utils/asyncHandler');
 
 const DEFAULT_PREFERENCES = {
@@ -31,6 +33,7 @@ function buildUserPayload(user) {
         },
         createdAt: user.createdAt,
         lastLoginAt: user.lastLoginAt,
+        passwordChangedAt: user.passwordChangedAt || null,
     };
 }
 
@@ -130,6 +133,14 @@ router.patch('/me/password', ensureAuthenticated, asyncHandler(async (req, res) 
     const user = await User.findById(req.user.id).select('+passwordHash');
     if (!user) return res.status(404).json({ success: false, message: 'Account not found.' });
 
+    const policy = evaluatePassword(value.newPassword, {
+        email: user.email,
+        name: user.displayName,
+    });
+    if (!policy.valid) {
+        return res.status(400).json({ success: false, message: policy.message });
+    }
+
     const hadPassword = Boolean(user.passwordHash);
     if (hadPassword) {
         if (!value.currentPassword) {
@@ -139,17 +150,117 @@ router.patch('/me/password', ensureAuthenticated, asyncHandler(async (req, res) 
         if (!matches) {
             return res.status(401).json({ success: false, message: 'Current password is incorrect.' });
         }
+        if (await user.comparePassword(value.newPassword)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Choose a password you have not used before.',
+            });
+        }
     }
 
     await user.setPassword(value.newPassword);
     if (!user.providers.some((provider) => provider.name === 'local')) {
         user.providers.push({ name: 'local', providerId: user.email });
     }
+    // Revoke sessions on other devices but keep this one signed in.
+    user.authVersion = (user.authVersion || 0) + 1;
     await user.save();
+    if (req.session) req.session.authVersion = user.authVersion;
+
+    // Best-effort notification; never hold up the password change response.
+    sendPasswordChangedEmail({
+        to: user.email,
+        name: user.displayName,
+        changedAt: user.passwordChangedAt,
+    }).catch(() => {});
 
     res.json({
         success: true,
-        message: hadPassword ? 'Password updated.' : 'Password added to your account.',
+        message: hadPassword
+            ? 'Password updated. Other devices have been signed out.'
+            : 'Password added to your account.',
+        user: buildUserPayload(user),
+    });
+}));
+
+router.get('/me/security', ensureAuthenticated, asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'Account not found.' });
+
+    const loginData = await getLoginHistory(req.user.id, req.sessionID);
+    const hasPassword = user.providers.some((provider) => provider.name === 'local');
+    const passwordAgeDays = user.passwordChangedAt
+        ? Math.floor((Date.now() - new Date(user.passwordChangedAt).getTime()) / 86400000)
+        : null;
+
+    const checks = [
+        {
+            id: 'password',
+            label: 'Password sign-in enabled',
+            passed: hasPassword,
+            hint: hasPassword
+                ? 'You can sign in without a social provider.'
+                : 'Add a password as a backup sign-in method.',
+        },
+        {
+            id: 'fresh',
+            label: 'Password changed in the last year',
+            passed: Boolean(user.passwordChangedAt) && passwordAgeDays <= 365,
+            hint: user.passwordChangedAt
+                ? `Last changed ${passwordAgeDays} day${passwordAgeDays === 1 ? '' : 's'} ago.`
+                : 'Set a password to start tracking this.',
+        },
+        {
+            id: 'devices',
+            label: 'Three or fewer recent devices',
+            passed: loginData.devices.length <= 3,
+            hint: `${loginData.devices.length} device${loginData.devices.length === 1 ? '' : 's'} seen recently.`,
+        },
+        {
+            id: 'attempts',
+            label: 'No failed sign-ins in recent history',
+            passed: loginData.summary.failed === 0,
+            hint: loginData.summary.failed
+                ? `${loginData.summary.failed} failed attempt${loginData.summary.failed === 1 ? '' : 's'} recorded.`
+                : 'No failed attempts recorded.',
+        },
+    ];
+
+    const passed = checks.filter((check) => check.passed).length;
+    const score = Math.round((passed / checks.length) * 100);
+    const level =
+        score >= 100 ? 'Excellent' : score >= 75 ? 'Good' : score >= 50 ? 'Needs attention' : 'At risk';
+
+    res.json({
+        success: true,
+        security: {
+            score,
+            level,
+            hasPassword,
+            passwordChangedAt: user.passwordChangedAt || null,
+            passwordAgeDays,
+            activeDevices: loginData.devices.length,
+            failedLogins: loginData.summary.failed,
+            lastSuccessAt: loginData.summary.lastSuccessAt,
+            lastFailedAt: loginData.summary.lastFailedAt,
+            checks,
+        },
+    });
+}));
+
+router.post('/me/logout-others', ensureAuthenticated, asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ success: false, message: 'Account not found.' });
+
+    // Every other session carries the previous version and is rejected on its
+    // next request. This session is moved to the new version.
+    user.authVersion = (user.authVersion || 0) + 1;
+    await user.save();
+    if (req.session) req.session.authVersion = user.authVersion;
+
+    res.json({
+        success: true,
+        message: 'All other devices have been signed out.',
         user: buildUserPayload(user),
     });
 }));

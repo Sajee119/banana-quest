@@ -15,6 +15,8 @@ const gameRoutes = require('./routes/game.routes');
 
 const app = express();
 
+// Hide the framework fingerprint.
+app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
 app.use(helmet());
@@ -34,10 +36,18 @@ const gameLimiter = rateLimit({
   max: 60,
   message: { success: false, message: 'Slow down! Too many game requests.' },
 });
+const passwordResetLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 15,
+    message: { success: false, message: 'Too many password reset attempts, try again later.' },
+});
 
 // Only credential endpoints are rate limited. Session checks (`/auth/status`)
 // run on every page load, so limiting them would sign active players out.
 app.use(['/auth/login', '/auth/register'], authLimiter);
+// Limit only the POST handlers. The GET token check must stay available so a
+// freshly emailed link can still be opened after several requests.
+app.post(['/auth/forgot-password', '/auth/reset-password'], passwordResetLimiter);
 app.use('/api/game', gameLimiter);
 // Session
 app.use(
@@ -64,6 +74,25 @@ app.use(
 // Passport
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Reject sessions whose auth version no longer matches the account. Password
+// changes, resets and "sign out other devices" bump the account version.
+app.use((req, res, next) => {
+    if (!req.isAuthenticated || !req.isAuthenticated() || !req.user) return next();
+
+    const sessionVersion = req.session?.authVersion ?? 0;
+    const userVersion = req.user.authVersion ?? 0;
+    if (sessionVersion === userVersion) return next();
+
+    req.logout((err) => {
+        if (err) return next(err);
+        req.session.destroy((destroyErr) => {
+            if (destroyErr) return next(destroyErr);
+            res.clearCookie('sid', { path: '/' });
+            next();
+        });
+    });
+});
 
 // Routes
 app.get('/', (req, res) => {
